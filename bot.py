@@ -398,19 +398,6 @@ async def help_command(interaction: discord.Interaction):
 
 
 @client.event
-async def on_presence_update(before: discord.Member, after: discord.Member):
-    if before.bot:
-        return
-    if before.status != discord.Status.online and after.status == discord.Status.online:
-        channel_id = os.getenv("NOTIFY_CHANNEL_ID")
-        if not channel_id:
-            return
-        channel = client.get_channel(int(channel_id))
-        if channel:
-            await channel.send(f"{after.display_name}님이 온라인입니다!")
-
-
-@client.event
 async def on_voice_state_update(member: discord.Member, before: discord.VoiceState, _after: discord.VoiceState):
     voice_client = member.guild.voice_client
     if not voice_client:
