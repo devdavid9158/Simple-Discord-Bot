@@ -118,7 +118,7 @@ YTDL_OPTIONS = {
     "noplaylist": True,
 }
 FFMPEG_OPTIONS = {
-    "before_options": "-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5",
+    "before_options": "-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5 -thread_queue_size 512",
     "options": "-vn",
 }
 
