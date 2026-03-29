@@ -208,9 +208,9 @@ async def join_voice(interaction: discord.Interaction):
     return voice_client
 
 
-@tree.command(name="play", description="유튜브 링크 또는 검색어로 오디오를 재생합니다.")
-@app_commands.describe(url="유튜브 링크 또는 검색어")
-async def play(interaction: discord.Interaction, url: str):
+# ── 음악 명령어 헬퍼 ──────────────────────────────────────────────────────────
+
+async def _play_impl(interaction: discord.Interaction, url: str):
     if not interaction.user.voice:
         await interaction.response.send_message("먼저 음성 채널에 입장해주세요.", ephemeral=True)
         return
@@ -239,46 +239,7 @@ async def play(interaction: discord.Interaction, url: str):
         await interaction.followup.send(f"▶️ **{title}**")
 
 
-@tree.command(name="playing", description="현재 재생 중인 곡을 확인합니다.")
-async def playing(interaction: discord.Interaction):
-    if not current_track:
-        await interaction.response.send_message("현재 재생 중인 곡이 없습니다.", ephemeral=True)
-        return
-    await interaction.response.send_message(f"▶️ **{current_track[2]}**")
-
-
-@tree.command(name="pause", description="재생을 일시정지합니다.")
-async def pause(interaction: discord.Interaction):
-    voice_client = interaction.guild.voice_client
-    if not voice_client or not voice_client.is_playing():
-        await interaction.response.send_message("현재 재생 중인 곡이 없습니다.", ephemeral=True)
-        return
-    voice_client.pause()
-    await interaction.response.send_message("⏸️ 일시정지했습니다.")
-
-
-@tree.command(name="resume", description="일시정지된 재생을 재개합니다.")
-async def resume(interaction: discord.Interaction):
-    voice_client = interaction.guild.voice_client
-    if not voice_client or not voice_client.is_paused():
-        await interaction.response.send_message("일시정지된 곡이 없습니다.", ephemeral=True)
-        return
-    voice_client.resume()
-    await interaction.response.send_message("▶️ 재생을 재개합니다.")
-
-
-@tree.command(name="queue", description="현재 대기열을 확인합니다.")
-async def show_queue(interaction: discord.Interaction):
-    if not queue:
-        await interaction.response.send_message("대기열이 비어있습니다.", ephemeral=True)
-        return
-    lines = [f"{i+1}. **{title}**" for i, (_, __, title) in enumerate(queue)]
-    await interaction.response.send_message("📋 **대기열**\n" + "\n".join(lines))
-
-
-@tree.command(name="playnext", description="다음 곡으로 대기열 맨 앞에 추가합니다.")
-@app_commands.describe(url="유튜브 링크 또는 검색어")
-async def playnext(interaction: discord.Interaction, url: str):
+async def _playnext_impl(interaction: discord.Interaction, url: str):
     if not interaction.user.voice:
         await interaction.response.send_message("먼저 음성 채널에 입장해주세요.", ephemeral=True)
         return
@@ -307,9 +268,40 @@ async def playnext(interaction: discord.Interaction, url: str):
         await interaction.followup.send(f"▶️ **{title}**")
 
 
-@tree.command(name="remove", description="대기열에서 특정 번호의 곡을 제거합니다.")
-@app_commands.describe(index="제거할 곡 번호")
-async def remove(interaction: discord.Interaction, index: int):
+async def _playing_impl(interaction: discord.Interaction):
+    if not current_track:
+        await interaction.response.send_message("현재 재생 중인 곡이 없습니다.", ephemeral=True)
+        return
+    await interaction.response.send_message(f"▶️ **{current_track[2]}**")
+
+
+async def _pause_impl(interaction: discord.Interaction):
+    voice_client = interaction.guild.voice_client
+    if not voice_client or not voice_client.is_playing():
+        await interaction.response.send_message("현재 재생 중인 곡이 없습니다.", ephemeral=True)
+        return
+    voice_client.pause()
+    await interaction.response.send_message("⏸️ 일시정지했습니다.")
+
+
+async def _resume_impl(interaction: discord.Interaction):
+    voice_client = interaction.guild.voice_client
+    if not voice_client or not voice_client.is_paused():
+        await interaction.response.send_message("일시정지된 곡이 없습니다.", ephemeral=True)
+        return
+    voice_client.resume()
+    await interaction.response.send_message("▶️ 재생을 재개합니다.")
+
+
+async def _queue_impl(interaction: discord.Interaction):
+    if not queue:
+        await interaction.response.send_message("대기열이 비어있습니다.", ephemeral=True)
+        return
+    lines = [f"{i+1}. **{title}**" for i, (_, __, title) in enumerate(queue)]
+    await interaction.response.send_message("📋 **대기열**\n" + "\n".join(lines))
+
+
+async def _remove_impl(interaction: discord.Interaction, index: int):
     if index < 1 or index > len(queue):
         await interaction.response.send_message("올바른 번호를 입력해주세요.", ephemeral=True)
         return
@@ -320,8 +312,7 @@ async def remove(interaction: discord.Interaction, index: int):
     await interaction.response.send_message(f"🗑️ 제거했습니다: **{removed[2]}**")
 
 
-@tree.command(name="shuffle", description="대기열을 섞습니다.")
-async def shuffle(interaction: discord.Interaction):
+async def _shuffle_impl(interaction: discord.Interaction):
     if len(queue) < 2:
         await interaction.response.send_message("대기열에 곡이 2개 이상 있어야 합니다.", ephemeral=True)
         return
@@ -333,16 +324,14 @@ async def shuffle(interaction: discord.Interaction):
     await interaction.response.send_message("🔀 **대기열을 섞었습니다.**\n" + "\n".join(lines))
 
 
-@tree.command(name="loop", description="현재 곡 반복 재생을 켜거나 끕니다.")
-async def loop_toggle(interaction: discord.Interaction):
+async def _loop_impl(interaction: discord.Interaction):
     global loop
     loop = not loop
     state = "켜졌습니다 🔁" if loop else "꺼졌습니다"
     await interaction.response.send_message(f"반복 재생이 {state}")
 
 
-@tree.command(name="skip", description="현재 곡을 건너뛰고 다음 곡을 재생합니다.")
-async def skip(interaction: discord.Interaction):
+async def _skip_impl(interaction: discord.Interaction):
     global loop
     voice_client = interaction.guild.voice_client
     if not voice_client or (not voice_client.is_playing() and not voice_client.is_paused()):
@@ -353,8 +342,7 @@ async def skip(interaction: discord.Interaction):
     await interaction.response.send_message("⏭️ 건너뛰었습니다.")
 
 
-@tree.command(name="stop", description="재생을 멈추고 음성 채널에서 나갑니다.")
-async def stop(interaction: discord.Interaction):
+async def _stop_impl(interaction: discord.Interaction):
     voice_client = interaction.guild.voice_client
     if voice_client and voice_client.is_connected():
         global current_track, loop
@@ -366,6 +354,124 @@ async def stop(interaction: discord.Interaction):
         await interaction.response.send_message("⏹️ 재생을 멈추고 채널에서 나왔습니다.")
     else:
         await interaction.response.send_message("봇이 음성 채널에 없습니다.", ephemeral=True)
+
+
+# ── 음악 명령어 (영어 / 한국어) ───────────────────────────────────────────────
+
+@tree.command(name="play", description="유튜브 링크 또는 검색어로 오디오를 재생합니다.")
+@app_commands.describe(url="유튜브 링크 또는 검색어")
+async def play(interaction: discord.Interaction, url: str):
+    await _play_impl(interaction, url)
+
+
+@tree.command(name="재생", description="유튜브 링크 또는 검색어로 오디오를 재생합니다.")
+@app_commands.describe(url="유튜브 링크 또는 검색어")
+async def play_ko(interaction: discord.Interaction, url: str):
+    await _play_impl(interaction, url)
+
+
+@tree.command(name="playnext", description="다음 곡으로 대기열 맨 앞에 추가합니다.")
+@app_commands.describe(url="유튜브 링크 또는 검색어")
+async def playnext(interaction: discord.Interaction, url: str):
+    await _playnext_impl(interaction, url)
+
+
+@tree.command(name="다음재생", description="다음 곡으로 대기열 맨 앞에 추가합니다.")
+@app_commands.describe(url="유튜브 링크 또는 검색어")
+async def playnext_ko(interaction: discord.Interaction, url: str):
+    await _playnext_impl(interaction, url)
+
+
+@tree.command(name="playing", description="현재 재생 중인 곡을 확인합니다.")
+async def playing(interaction: discord.Interaction):
+    await _playing_impl(interaction)
+
+
+@tree.command(name="현재곡", description="현재 재생 중인 곡을 확인합니다.")
+async def playing_ko(interaction: discord.Interaction):
+    await _playing_impl(interaction)
+
+
+@tree.command(name="pause", description="재생을 일시정지합니다.")
+async def pause(interaction: discord.Interaction):
+    await _pause_impl(interaction)
+
+
+@tree.command(name="일시정지", description="재생을 일시정지합니다.")
+async def pause_ko(interaction: discord.Interaction):
+    await _pause_impl(interaction)
+
+
+@tree.command(name="resume", description="일시정지된 재생을 재개합니다.")
+async def resume(interaction: discord.Interaction):
+    await _resume_impl(interaction)
+
+
+@tree.command(name="계속재생", description="일시정지된 재생을 재개합니다.")
+async def resume_ko(interaction: discord.Interaction):
+    await _resume_impl(interaction)
+
+
+@tree.command(name="queue", description="현재 대기열을 확인합니다.")
+async def show_queue(interaction: discord.Interaction):
+    await _queue_impl(interaction)
+
+
+@tree.command(name="대기열", description="현재 대기열을 확인합니다.")
+async def show_queue_ko(interaction: discord.Interaction):
+    await _queue_impl(interaction)
+
+
+@tree.command(name="remove", description="대기열에서 특정 번호의 곡을 제거합니다.")
+@app_commands.describe(index="제거할 곡 번호")
+async def remove(interaction: discord.Interaction, index: int):
+    await _remove_impl(interaction, index)
+
+
+@tree.command(name="제거", description="대기열에서 특정 번호의 곡을 제거합니다.")
+@app_commands.describe(index="제거할 곡 번호")
+async def remove_ko(interaction: discord.Interaction, index: int):
+    await _remove_impl(interaction, index)
+
+
+@tree.command(name="shuffle", description="대기열을 섞습니다.")
+async def shuffle(interaction: discord.Interaction):
+    await _shuffle_impl(interaction)
+
+
+@tree.command(name="셔플", description="대기열을 섞습니다.")
+async def shuffle_ko(interaction: discord.Interaction):
+    await _shuffle_impl(interaction)
+
+
+@tree.command(name="loop", description="현재 곡 반복 재생을 켜거나 끕니다.")
+async def loop_toggle(interaction: discord.Interaction):
+    await _loop_impl(interaction)
+
+
+@tree.command(name="반복", description="현재 곡 반복 재생을 켜거나 끕니다.")
+async def loop_toggle_ko(interaction: discord.Interaction):
+    await _loop_impl(interaction)
+
+
+@tree.command(name="skip", description="현재 곡을 건너뛰고 다음 곡을 재생합니다.")
+async def skip(interaction: discord.Interaction):
+    await _skip_impl(interaction)
+
+
+@tree.command(name="건너뛰기", description="현재 곡을 건너뛰고 다음 곡을 재생합니다.")
+async def skip_ko(interaction: discord.Interaction):
+    await _skip_impl(interaction)
+
+
+@tree.command(name="stop", description="재생을 멈추고 음성 채널에서 나갑니다.")
+async def stop(interaction: discord.Interaction):
+    await _stop_impl(interaction)
+
+
+@tree.command(name="정지", description="재생을 멈추고 음성 채널에서 나갑니다.")
+async def stop_ko(interaction: discord.Interaction):
+    await _stop_impl(interaction)
 
 
 @tree.command(name="help", description="사용 가능한 명령어 목록을 확인합니다.")
@@ -381,18 +487,18 @@ async def help_command(interaction: discord.Interaction):
         "`/rps_stop` — 진행 중인 게임 취소\n\n"
         "**[[ 🎵 음악 ]]**\n\n"
         "▶️  재생 / 정지\n"
-        "`/play {링크 또는 검색어}` — 음악 재생 또는 대기열 추가\n"
-        "`/pause` — 일시정지\n"
-        "`/resume` — 재개\n"
-        "`/skip` — 현재 곡 건너뛰기\n"
-        "`/stop` — 재생 중지 및 채널 퇴장\n"
-        "`/loop` — 현재 곡 반복 재생 토글\n"
-        "`/playing` — 현재 재생 중인 곡 확인\n\n"
+        "`/play` `/재생` — 음악 재생 또는 대기열 추가\n"
+        "`/pause` `/일시정지` — 일시정지\n"
+        "`/resume` `/계속재생` — 재개\n"
+        "`/skip` `/건너뛰기` — 현재 곡 건너뛰기\n"
+        "`/stop` `/정지` — 재생 중지 및 채널 퇴장\n"
+        "`/loop` `/반복` — 현재 곡 반복 재생 토글\n"
+        "`/playing` `/현재곡` — 현재 재생 중인 곡 확인\n\n"
         "📋 대기열\n"
-        "`/playnext {링크 또는 검색어}` — 대기열 맨 앞에 추가\n"
-        "`/queue` — 대기열 확인\n"
-        "`/remove {번호}` — 특정 곡 제거\n"
-        "`/shuffle` — 대기열 섞기\n"
+        "`/playnext` `/다음재생` — 대기열 맨 앞에 추가\n"
+        "`/queue` `/대기열` — 대기열 확인\n"
+        "`/remove` `/제거` — 특정 곡 제거\n"
+        "`/shuffle` `/셔플` — 대기열 섞기\n"
     )
     await interaction.response.send_message(msg)
 
